@@ -1,0 +1,7 @@
+Name: Ghoti.io Defiant Storage Postgres(BRANCH)
+Description: Postgres backend for the Defiant storage port
+Version: (VERSION)
+URL: https://github.com/Ghoti-io/defiant-storage-postgres
+Libs: -L(PC_LIB_DIR) -l(SUITE)-(PROJECT)(BRANCH)
+CFlags: -I(PC_INCLUDE_DIR)
+Requires: (REQUIRES)
