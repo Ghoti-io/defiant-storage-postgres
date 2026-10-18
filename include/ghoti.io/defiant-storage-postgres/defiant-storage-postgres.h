@@ -30,5 +30,6 @@
 #include <ghoti.io/defiant-storage-postgres/macros.h>
 #include <ghoti.io/defiant-storage-postgres/allocator.h>
 #include <ghoti.io/defiant-storage-postgres/core.h>
+#include <ghoti.io/defiant-storage-postgres/model.h>
 
 #endif /* GHOTI_IO_GDEFSPG_DEFIANT_STORAGE_POSTGRES_H */

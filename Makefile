@@ -447,7 +447,7 @@ TESTFLAGS := `PKG_CONFIG_PATH=$(PKG_CONFIG_LOOKUP_PATH) pkg-config --libs --cfla
 # coverage target does, because --coverage links the gcov runtime, whose
 # mangle_path check-symbols is right to reject in a shipping library and
 # wrong to reject in an instrumented one. Spelled as text's TEST_GATES is.
-TEST_GATES ?= check-symbols check-aliasing
+TEST_GATES ?= check-symbols check-aliasing check-seams
 
 # Valgrind flags (exclude "still reachable" as it's not a leak)
 # --suppressions: see tests/valgrind.supp. It holds allocations that are
@@ -678,7 +678,7 @@ $(APP_DIR)/examples/%$(EXE_EXTENSION): examples/%.c $(APP_DIR)/$(STATIC_TARGET) 
 ####################################################################
 
 # General commands
-.PHONY: clean cloc docs docs-pdf examples coverage check-symbols check-aliasing
+.PHONY: clean cloc docs docs-pdf examples coverage check-symbols check-aliasing check-seams
 # Release build commands
 .PHONY: all install test test-quiet test-asan test-valgrind test-valgrind-quiet test-watch uninstall watch
 # Debug build commands
@@ -869,6 +869,9 @@ check-aliasing: ## Fail if the strict-aliasing warning is not actually armed
 		printf '\033[0;31mcheck-aliasing: CFLAGS resolves to -Wstrict-aliasing=%s, and only level 1 reports the planted store - 0, 2 and 3 are all silent on it. The level is wrong; the flags are not missing. Note that 3 is also what -Wall implies, so it means either an explicit override later on the command line or ALIASING flags that stopped being passed, and this cannot tell which.\033[0m\n' "$$level" >&2; \
 	fi; \
 	exit 1
+check-seams: ## Fail if libpq is reached outside src/model.c or SQL text outside the dialect
+	@tools/check-seams.sh . --self-test
+
 check-symbols: ## Fail if any exported symbol lacks the version namespace
 check-symbols: $(APP_DIR)/$(TARGET)
 ifeq ($(OS_NAME), Linux)
@@ -1288,8 +1291,10 @@ fuzz-run-$2: $$(FUZZ_APP_DIR)/$1
 		-max_total_time=$$(FUZZ_TIME) -print_final_stats=1
 endef
 
-fuzz: ## Build and run every fuzzer for $(FUZZ_TIME) seconds each (none yet)
-	@printf "no fuzz harness yet\n"
+$(eval $(call fuzz-rule,fuzz_wire,wire))
+
+fuzz: ## Build and run every fuzzer for $(FUZZ_TIME) seconds each
+fuzz: fuzz-run-wire
 
 fuzz-clean: ## Remove the fuzz build (keeps the corpus)
 	-@rm -rf $(FUZZ_DIR)
