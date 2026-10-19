@@ -95,4 +95,12 @@ plant index-build-in-transaction src/model.c testIndex \
     PQclear(PQexec(c->pg, "ROLLBACK"));
   }'
 
+# An erasure that leaves the destroyed key in the table's pages: no vacuum
+# after the commit (story S5b).
+plant_control testKeys 'PgKeys.*'
+plant key-vacuum-dropped src/model.c testKeys \
+  'PgKeys.AnErasureVacuumsTheKeyTablesOutsideTheTransaction' \
+  '  d->key_vacuum = "VACUUM (FULL) ";' \
+  '  d->key_vacuum = NULL;'
+
 plant_finish

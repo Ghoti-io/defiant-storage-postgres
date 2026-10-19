@@ -21,10 +21,14 @@ any pooled connection serves any tenant. The first write of a tenant makes its
 schema (`CREATE SCHEMA IF NOT EXISTS`) in the same transaction as its tables.
 
 A key store is the same arrangement (default prefix `dk_`) in a database of
-its own, never the data store's (AD-13, AD-19). What Postgres keeps of a
-destroyed key - its dead tuple until vacuum, the WAL and any archive of it -
-is beyond this library; that is why the key store is a port of its own with
-backups of its own.
+its own, never the data store's (AD-13, AD-19). A destroyed key is a dead
+tuple until a vacuum, so after an erasure commits the key store runs
+`VACUUM (FULL)` on `dsk_key` and `dsk_sealed`, outside the transaction, which
+writes each table anew and removes the old pages (the dialect's `key_vacuum`;
+a failed vacuum is reported, and the erasure stands). What the WAL and any
+archive of it keep is beyond this library: **expiring WAL archives is the
+operator's**, on the key store's own retention. That is why the key store is a
+port of its own with backups of its own.
 
 ## 2. Connections and transactions
 
@@ -144,10 +148,12 @@ when the run ends, so nothing of the run is left on the box.
 | `testAgree` | a seeded sweep against the reference scan, the memory backend and the SQLite backend; derived tables wiped from outside and rebuilt |
 | `testPool` | two tenants on one pooled connection carry nothing; a failed statement's connection is never used again; a step meets a lock and fails; refused schemas; names |
 | `testIndex` | concurrent builds outside the step; a failed build's invalid index dropped and rebuilt |
+| `testKeys` | an erasure, and a restore that replays one, vacuums the key tables outside the transaction and replaces their files |
 | `testScale` | 10,000 orders: `EXPLAIN` of every compiled statement names its index |
 | `testDialect` | the dialect, and text by bytes on a database whose collation is not |
 | `testHarness` | no server, a server that does not answer, the skip flag |
 
 `make check-pg` plants a session-level `search_path`, `COLLATE "C"` dropped, a
-connection reused after an error, an index build inside a transaction and a
-skipped arm reported as passing, and requires each named test to fail.
+connection reused after an error, an index build inside a transaction, a
+skipped arm reported as passing and an erasure with no vacuum after it, and
+requires each named test to fail.

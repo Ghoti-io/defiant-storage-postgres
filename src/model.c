@@ -111,6 +111,9 @@ static void fill_dialect(GDEFSSQL_Dialect * d) {
   d->index_drop = "DROP INDEX CONCURRENTLY IF EXISTS ";
   d->qualifier_create = "CREATE SCHEMA IF NOT EXISTS ";
   d->store_exists = kStoreExists;
+  /* A deleted key row is a dead tuple until a vacuum; FULL writes the table
+   * anew, so the old pages go with it (dialect.h, key_vacuum). */
+  d->key_vacuum = "VACUUM (FULL) ";
 }
 
 void gdefspg_dialect(GDEFSSQL_Dialect * out) {
