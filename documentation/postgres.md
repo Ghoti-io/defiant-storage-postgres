@@ -47,6 +47,26 @@ connect and the same on every connection. They are the "session settings"
 this library adds; `lock_timeout` bounds every wait for a lock, that of a
 schema step and that of a concurrent index build (AD-15).
 
+Records, counters and the outbox (story S6a) are tables of the tenant's
+schema written in the write's `SERIALIZABLE` transaction, so Postgres itself
+keeps two writers of one tenant (two stores, or two nodes) from committing
+the same counter value or holding live leases on one stream: one of two
+transactions that read and change one row is stopped with `40001`
+(`GDEFSTOR_ERR_BUSY`), and the caller tries again. `tests/test_system.cpp`
+shows both with two stores on one schema, a thread each.
+
+One case stays open, and is the reason the counter's rule is stated per
+backend in defiant-storage-sql's `sql.md` ("Counters and aborts"): every
+write runs inside a savepoint, and an abort of a write that took a counter
+value rolls back to it and then commits the counter's floor. Rolling back to
+a savepoint releases the counter's row, so a writer on another connection
+that was waiting on that row can take the same value before the floor lands.
+Values committed are never repeated; an aborted writer and a committed one
+can have held the same number. Closing that needs a reservation outside the
+write, which a Postgres sequence is and the shared dialect interface does not
+have; it matters to a caller only if it uses a value of a write it then
+aborts.
+
 Values travel as untyped parameters, typed by the server from where each
 stands: integers in the text format (so a boolean bound as an int64 lands in
 its `SMALLINT` column), doubles, text and bytes in the binary format, results
