@@ -85,13 +85,17 @@ if ! "$ENGINE" image inspect "$PG_IMAGE" >/dev/null 2>&1; then
   fi
 fi
 
-# A random port; another one if it is taken.
+# A random port; another one if it is taken. The server is thrown away after
+# the run, so it does not wait for the disk: the conformance suite's
+# allocation-failure tests make a schema per allocation, and on SQLite the
+# first of them took 1,149 s on disk and 35 s on tmpfs (EVO-X2, 2026-10-19).
 started=0
 for try in 1 2 3 4 5; do
   PORT=$(( 20000 + $(od -An -N2 -tu2 /dev/urandom | tr -d ' ') % 40000 ))
   if "$ENGINE" run -d --rm --name "$NAME" --memory 512m --memory-swap 512m \
       -p "127.0.0.1:$PORT:5432" -e POSTGRES_PASSWORD="$PW" \
-      "$PG_IMAGE" >/dev/null 2>&1; then
+      "$PG_IMAGE" -c fsync=off -c synchronous_commit=off \
+      -c full_page_writes=off >/dev/null 2>&1; then
     started=1
     break
   fi
