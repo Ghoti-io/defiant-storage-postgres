@@ -94,6 +94,10 @@ The build runs in the committing call, after its commit: a declaration that
 adds an index to a large table returns when the index is built, or when its
 build gave up. Moving builds to a background worker is not built.
 
+The blind table of a type with a personal field (`tN_b`, defiant-storage-sql's
+`sql.md`) and its two indexes are steps like these: the table in the declaring
+step, the indexes built concurrently after it. A MAC is bound as `bytea`.
+
 ## 6. Building and testing
 
 libpq is found with `pkg-config libpq` and only inside the build image this
