@@ -27,6 +27,8 @@
  * gdefstor_model_scan() over the same Postgres rows (the tee), and must equal
  * the memory backend's and the SQLite backend's, page order and total
  * included. The sweep requires that it met the cases that tell engines apart.
+ * A tenant's snapshot (story S6a3) travels memory -> SQLite -> Postgres ->
+ * memory, every truth row unchanged at each step.
  */
 
 #include <gtest/gtest.h>
@@ -36,10 +38,12 @@
 
 #include "pg_rig.h"
 #include "query_gen.h"
+#include "snapshot_fixture.inc"
 #include "tmpdir.h"
 
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <random>
 #include <string>
 #include <vector>
@@ -463,6 +467,88 @@ TEST(PgAgreement, RebuiltCurrentTablesAnswerAlike) {
     ASSERT_EQ(GDEFSTOR_OK, Ask(pg.store, "shop.order", b.q, &ids, &total));
   }
   EXPECT_EQ(0, pg.tee.disagreements) << pg.tee.first_disagreement;
+}
+
+/* One tenant's snapshot through every backend: memory, then SQLite, then
+ * Postgres, then a second memory store. The truth dump is byte-identical at
+ * every step (the source's), the current tables are rebuilt alike, and every
+ * step's export is the same bytes. Once for the fixture of every kind of
+ * truth, and once for each of two seeded random populations. */
+void ThroughEveryBackend(
+    const std::function<GDEFSTOR_Result(GDEFSTOR_Store *)> & fill,
+    const std::string & what) {
+  GDEFSTOR_Store * mem = nullptr;
+  ASSERT_EQ(GDEFSMEMORY_OK, gdefsmemory_store_create(nullptr, nullptr, &mem));
+  ASSERT_EQ(GDEFSTOR_OK, fill(mem)) << what;
+  const std::string truth =
+      snapshot_fixture::Dump(mem, kTenant, GDEFSTOR_MODEL_TRUTH);
+  const std::string current =
+      snapshot_fixture::Dump(mem, kTenant, GDEFSTOR_MODEL_CURRENT);
+  ASSERT_FALSE(truth.empty()) << what;
+  const std::string zip = snapshot_fixture::Export(mem, kTenant);
+  ASSERT_FALSE(zip.empty()) << what;
+  gdefstor_store_destroy(mem);
+  std::string why;
+  /* memory -> SQLite */
+  Lite lite;
+  ASSERT_FALSE(lite.dir.empty());
+  ASSERT_EQ(GDEFSSQLITE_OK, gdefssqlite_model_store_create(lite.dir.c_str(),
+      nullptr, nullptr, nullptr, &lite.store));
+  ASSERT_EQ(GDEFSTOR_OK,
+      snapshot_fixture::Import(lite.store, kTenant, zip, &why))
+      << what << ": " << why;
+  EXPECT_EQ(truth,
+      snapshot_fixture::Dump(lite.store, kTenant, GDEFSTOR_MODEL_TRUTH))
+      << what << ": memory to SQLite";
+  EXPECT_EQ(current,
+      snapshot_fixture::Dump(lite.store, kTenant, GDEFSTOR_MODEL_CURRENT))
+      << what;
+  const std::string from_lite = snapshot_fixture::Export(lite.store, kTenant);
+  EXPECT_EQ(zip, from_lite) << what;
+  /* SQLite -> Postgres */
+  Pg pg;
+  OpenPg(pg, 0);
+  ASSERT_NE(nullptr, pg.store);
+  ASSERT_EQ(GDEFSTOR_OK,
+      snapshot_fixture::Import(pg.store, kTenant, from_lite, &why))
+      << what << ": " << why;
+  EXPECT_EQ(truth,
+      snapshot_fixture::Dump(pg.store, kTenant, GDEFSTOR_MODEL_TRUTH))
+      << what << ": SQLite to Postgres";
+  EXPECT_EQ(current,
+      snapshot_fixture::Dump(pg.store, kTenant, GDEFSTOR_MODEL_CURRENT))
+      << what;
+  const std::string from_pg = snapshot_fixture::Export(pg.store, kTenant);
+  EXPECT_EQ(zip, from_pg) << what;
+  /* Postgres -> memory */
+  GDEFSTOR_Store * back = nullptr;
+  ASSERT_EQ(GDEFSMEMORY_OK, gdefsmemory_store_create(nullptr, nullptr, &back));
+  ASSERT_EQ(GDEFSTOR_OK, snapshot_fixture::Import(back, kTenant, from_pg, &why))
+      << what << ": " << why;
+  EXPECT_EQ(truth, snapshot_fixture::Dump(back, kTenant, GDEFSTOR_MODEL_TRUTH))
+      << what << ": Postgres to memory";
+  EXPECT_EQ(current,
+      snapshot_fixture::Dump(back, kTenant, GDEFSTOR_MODEL_CURRENT))
+      << what;
+  EXPECT_EQ(zip, snapshot_fixture::Export(back, kTenant)) << what;
+  gdefstor_store_destroy(back);
+  EXPECT_EQ(0, pg.tee.disagreements) << pg.tee.first_disagreement;
+}
+
+TEST(PgAgreement, ASnapshotTravelsMemorySqlitePostgresMemoryUnchanged) {
+  if (!pgrig::Running()) {
+    GTEST_SKIP() << "SKIPPED: postgres";
+  }
+  ThroughEveryBackend([](GDEFSTOR_Store * s) {
+    return snapshot_fixture::Populate(s, kTenant, false);
+  }, "the fixture");
+  for (uint32_t seed = 1; seed <= 2 && !HasFailure(); seed++) {
+    ThroughEveryBackend([seed](GDEFSTOR_Store * s) {
+      qgen::Gen g(seed);
+      g.norders = 10 + g.Pick(20);
+      return g.Populate(s);
+    }, "seed " + std::to_string(seed));
+  }
 }
 
 }  // namespace

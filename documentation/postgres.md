@@ -165,7 +165,7 @@ when the run ends, so nothing of the run is left on the box.
 | Program | What |
 | --- | --- |
 | `testModel` | the port's conformance suite (`model.inc`, the purchase-order fixture) and the key store suite (`keystore.inc`), every query tee'd against `gdefstor_model_scan()` |
-| `testAgree` | a seeded sweep against the reference scan, the memory backend and the SQLite backend; derived tables wiped from outside and rebuilt |
+| `testAgree` | a seeded sweep against the reference scan, the memory backend and the SQLite backend; derived tables wiped from outside and rebuilt; a tenant's snapshot carried memory -> SQLite -> Postgres -> memory, the truth byte-identical and every export the same bytes at each step |
 | `testPool` | two tenants on one pooled connection carry nothing; a failed statement's connection is never used again; a step meets a lock and fails; refused schemas; names |
 | `testIndex` | concurrent builds outside the step; a failed build's invalid index dropped and rebuilt |
 | `testKeys` | an erasure, and a restore that replays one, vacuums the key tables outside the transaction and replaces their files |
