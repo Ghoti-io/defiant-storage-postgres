@@ -146,7 +146,8 @@ GDEFSTOR_Result SaveNew(GDEFSTOR_Write * w, const char * type,
   }
   GDEFSTOR_RevisionMeta m = Meta();
   if (rc == GDEFSTOR_OK) {
-    rc = gdefstor_entity_save(w, pid.data(), pid.size(), 0, &m, t, nullptr);
+    rc = gdefstor_entity_save(w, pid.data(), pid.size(), 0, &m, "en", 2, t,
+        nullptr);
   }
   gdefstor_tree_free(t);
   return rc;
@@ -391,6 +392,8 @@ GDEFSTOR_Query Page(const GDEFSTOR_QueryNode * where, uint64_t limit = 20) {
   GDEFSTOR_Query q;
   std::memset(&q, 0, sizeof q);
   q.size = sizeof q;
+  q.language = "en";
+  q.language_len = 2;
   q.where = where;
   q.limit = limit;
   return q;
@@ -541,7 +544,7 @@ TEST_F(Scale, AFilteredCountUsesTheFieldIndex) {
       q.Values({Txt("b123")}));
   auto c = Measure([&]() {
     ASSERT_EQ(GDEFSTOR_OK, gdefstor_entity_count(g_big->store, kTenant, 2,
-        "shop.order", 10, where, &n));
+        "shop.order", 10, "en", 2, where, &n));
   });
   EXPECT_EQ(uint64_t(g_big->orders / 1000), n);
   ExpectPlanNames(c, "shop.order", {IndexOf("shop.order", "bucket")});
@@ -575,7 +578,9 @@ TEST_F(Scale, AFilterOnAFieldWithNoIndexIsSeenToFilterRows) {
   ASSERT_FALSE(stmts.empty());
   for (const Rec & r : stmts) {
     std::string plan = Plan(r);
-    EXPECT_NE(std::string::npos, plan.find("Filter: (" + col + " = ")) << plan;
+    /* The filter names the query's language too: `(lang = ...) AND (vN = ...)`. */
+    EXPECT_NE(std::string::npos, plan.find("Filter: (")) << plan;
+    EXPECT_NE(std::string::npos, plan.find("(" + col + " = ")) << plan;
     EXPECT_EQ(std::string::npos, plan.find("Index Cond: (" + col + " ")) << plan;
   }
   /* And an indexed field's filter is an Index Cond on its column. */

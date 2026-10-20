@@ -178,6 +178,8 @@ class Pool : public ::testing::Test {
     GDEFSTOR_Query q;
     std::memset(&q, 0, sizeof q);
     q.size = sizeof q;
+    q.language = "en";
+    q.language_len = 2;
     q.where = &leaf;
     q.limit = 50;
     std::vector<std::string> ids;
@@ -375,7 +377,7 @@ TEST_F(Pool, AReadOfATenantWithNoStoreMakesNothing) {
       "site.note", 9, &type));
   uint64_t n = 7;
   EXPECT_EQ(GDEFSTOR_ERR_INVALID, gdefstor_entity_count(store, "t9", 2,
-      "site.note", 9, nullptr, &n));
+      "site.note", 9, "en", 2, nullptr, &n));
   pgrig::Side side(pgrig::S().conninfo);
   EXPECT_EQ("0", side.One("SELECT count(*) FROM pg_namespace WHERE nspname = '" +
                           Schema("t9") + "'"));

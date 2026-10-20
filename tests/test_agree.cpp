@@ -140,7 +140,8 @@ void Sweep(uint32_t seed, Seen & seen) {
     EXPECT_EQ(ltotal, total) << "seed " << seed << " query " << n;
     uint64_t count = 0;
     ASSERT_EQ(GDEFSTOR_OK, gdefstor_entity_count(pg.store, kTenant, 2, type,
-        std::strlen(type), b.q.where, &count));
+        std::strlen(type), b.q.language, b.q.language_len, b.q.where,
+        &count));
     EXPECT_EQ(total, count) << "seed " << seed << " query " << n;
     seen.queries++;
     (ids.empty() ? seen.empty : seen.nonempty)++;

@@ -131,6 +131,8 @@ class PgIndex : public ::testing::Test {
     GDEFSTOR_Query q;
     std::memset(&q, 0, sizeof q);
     q.size = sizeof q;
+    q.language = "en";
+    q.language_len = 2;
     q.where = &leaf;
     q.limit = 100;
     std::vector<std::string> ids;
