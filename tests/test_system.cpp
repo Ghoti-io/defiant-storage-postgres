@@ -82,7 +82,7 @@ TEST(PgSystem, TwoStoresNeverCommitOneCounterValue) {
   ASSERT_NE(nullptr, p.s[0]);
   ASSERT_NE(nullptr, p.s[1]);
   ASSERT_EQ(GDEFSTOR_OK, InWrite(p.s[0], [](GDEFSTOR_Write * w) {
-    return gdefstor_record_put(w, "core.m", 6, "k", 1, nullptr, 0);
+    return gdefstor_record_put(w, "core.m", 6, "k", 1, "test/1", 6, nullptr, 0);
   }));
   std::mutex mu;
   std::vector<uint64_t> committed;
