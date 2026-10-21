@@ -1,13 +1,12 @@
 # The build image for defiant-storage-postgres: ghoti-build:gcc16 and libpq.
 #
 # libpq is built against only inside this image, never on a developer host
-# (spine, version table: PostgreSQL). Build it after ghoti-build:gcc16
+# (this library's pinned dependencies). Build it after ghoti-build:gcc16
 # (suite/Containerfile.build) exists in the same engine:
 #
 #   podman build -t ghoti-build-pg:gcc16-libpq17.11 -f Containerfile .
 #
-# On the EVO-X2: tools/evo image build localhost/ghoti-build-pg:gcc16-libpq17.11
-# <dir holding this file> <this file>.
+# Any engine that builds images from a directory and a file does the same.
 #
 # The base is the local ghoti-build:gcc16 by its tag: that image is built
 # where it runs and has no registry digest, and its own Containerfile pins

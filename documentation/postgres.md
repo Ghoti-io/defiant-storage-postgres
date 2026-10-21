@@ -131,7 +131,7 @@ repository's `Containerfile` defines (`ghoti-build:gcc16` plus the pinned
 `libpq-dev`); it is never installed on a developer host. Without it the
 Makefile stops and names the image.
 
-`make test` needs a server. `tools/pg-test.sh` starts one: the spine's
+`make test` needs a server. `tools/pg-test.sh` starts one: the pinned
 `docker.io/library/postgres@sha256:885953...` (18.6, linux/amd64) in podman or
 docker on `127.0.0.1` and a random port, waits for it, runs a command in the
 build image on the host's network with `GDEFSPG_TEST_CONNINFO` set, and removes
@@ -148,21 +148,19 @@ podman build -t ghoti-build-pg:gcc16-libpq17.11 -f Containerfile .
 tools/pg-test.sh -- 'make test PREFIX=$PWD/../../.local-defiant-storage-postgres'
 ```
 
-(the prefix holding its dependencies, built in the same image). On the EVO-X2
-the build container has no container engine, so the tests run in the job's
-host phase (`tools/evo run --host-after`), which has docker:
+(the prefix holding its dependencies, built in the same image). Where the
+dependencies are built inside a container that has no container engine of its
+own, build them there first, then run `tools/pg-test.sh` from the host that
+has the engine, mounting the same directory:
 
 ```
-tools/evo image build localhost/ghoti-build-pg:gcc16-libpq17.11 DIR DIR/Containerfile
-tools/evo run JOB --image localhost/ghoti-build-pg:gcc16-libpq17.11 \
-  --host-after 'sh src/defiant-storage-postgres/tools/pg-test.sh --pull-and-remove \
-    --image localhost/ghoti-build-pg:gcc16-libpq17.11 --mount "$JOB:/job" --workdir /job \
-    -- "make -C src/defiant-storage-postgres test PREFIX=/job/prefix"' \
-  -- '<install the dependencies into $PREFIX>'
+tools/pg-test.sh --pull-and-remove --engine docker \
+  --image ghoti-build-pg:gcc16-libpq17.11 --mount "$DIR:/work" --workdir /work \
+  -- 'make -C src/defiant-storage-postgres test PREFIX=/work/prefix'
 ```
 
 `--pull-and-remove` pulls the server image by its digest and removes it again
-when the run ends, so nothing of the run is left on the box.
+when the run ends, so nothing of the run is left on the host.
 
 | Program | What |
 | --- | --- |

@@ -63,9 +63,8 @@ inline const char * kFix =
     "the Postgres tests need a server. Run them through tools/pg-test.sh, "
     "which starts docker.io/library/postgres@sha256:885953109528ad3dfc90362b1"
     "a6f50a78620b5315be19f187753d267e484dc5b with podman (or docker) on a "
-    "random port and runs `make test` in the image the Containerfile builds; "
-    "on the EVO-X2, through tools/evo run --host-after (documentation/"
-    "postgres.md). To skip the Postgres arm instead, set "
+    "random port and runs `make test` in the image the Containerfile builds "
+    "(documentation/postgres.md). To skip the Postgres arm instead, set "
     "GDEFSPG_TEST_SKIP_SERVER=1: it is then reported as SKIPPED: postgres, "
     "never as passed.";
 

@@ -4,7 +4,7 @@
 #
 # Run a command against a throwaway Postgres server.
 #
-# Starts docker.io/library/postgres by the digest the spine pins (18.6,
+# Starts docker.io/library/postgres by its pinned digest (18.6,
 # linux/amd64) in podman or docker, on 127.0.0.1 and a random port, with a
 # random password and a 512 MB memory cap; waits until it accepts
 # connections; runs COMMAND in the build image (the one this repository's
@@ -23,11 +23,12 @@
 #   --env NAME=VALUE  set in COMMAND's container (repeatable)
 #   --memory SIZE     COMMAND's container's memory cap (default 4g)
 #   --pull-and-remove pull the server image if it is missing and remove it
-#                     again at exit if this run pulled it (the EVO-X2)
+#                     again at exit if this run pulled it (for a shared
+#                     host that should keep nothing)
 #
-# On the EVO-X2 it runs as the host phase of a job, where
-# GHOTI_CONTAINER_ENGINE is the job's capped docker (tools/evo help,
-# --host-after); documentation/postgres.md has the commands.
+# Where the build runs in a container without an engine of its own, run this
+# on the host afterwards (GHOTI_CONTAINER_ENGINE names that host's engine);
+# documentation/postgres.md has the commands.
 
 set -u
 
@@ -88,7 +89,7 @@ fi
 # A random port; another one if it is taken. The server is thrown away after
 # the run, so it does not wait for the disk: the conformance suite's
 # allocation-failure tests make a schema per allocation, and on SQLite the
-# first of them took 1,149 s on disk and 35 s on tmpfs (EVO-X2, 2026-10-19).
+# first of them took 1,149 s on disk and 35 s on tmpfs (2026-10-19).
 started=0
 for try in 1 2 3 4 5; do
   PORT=$(( 20000 + $(od -An -N2 -tu2 /dev/urandom | tr -d ' ') % 40000 ))

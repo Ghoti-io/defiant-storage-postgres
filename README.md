@@ -32,7 +32,8 @@ which `tools/pg-test.sh` starts (the pinned `postgres:18` image by digest,
 PostgreSQL 18.6); `GDEFSPG_TEST_SKIP_SERVER=1` skips the Postgres arm and says
 `SKIPPED: postgres`, and each program that needs a server reports one test
 skipped and none passed.
-`documentation/postgres.md` has the commands, locally and on the EVO-X2.
+`documentation/postgres.md` has the commands, including for a build host
+whose build container has no container engine.
 
 ## The API
 
