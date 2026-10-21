@@ -1,6 +1,8 @@
 # The Postgres backend
 
-**Status:** describes what shipped in story S4 (2026-10-18).
+**Status:** describes what is built: story S4 (2026-10-18), with records,
+counters and the outbox (S6a) and the restore members a snapshot import
+writes through (S6a3), over defiant-storage-sql's schema at version 1.
 
 `defiant-storage-postgres` serves the entity port (`defiant-storage`'s
 `model.h`) and the key store port (`keystore.h`) from Postgres, through
@@ -135,9 +137,9 @@ docker on `127.0.0.1` and a random port, waits for it, runs a command in the
 build image on the host's network with `GDEFSPG_TEST_CONNINFO` set, and removes
 the server on every exit path. Without a server the test programs fail before
 any test, naming that script; with `GDEFSPG_TEST_SKIP_SERVER=1` they skip, print
-`SKIPPED: postgres`, and gtest counts their tests as skipped, never passed
-(`make test` ends with the same line). `testHarness` checks those three
-behaviours by running itself, and needs no server.
+`SKIPPED: postgres`, and gtest reports one test (the arm's gate) skipped and
+none passed (`make test` ends with the same line). `testHarness` checks those
+three behaviors by running itself, and needs no server.
 
 Locally, with the build image made once:
 
@@ -172,8 +174,20 @@ when the run ends, so nothing of the run is left on the box.
 | `testScale` | 10,000 orders: `EXPLAIN` of every compiled statement names its index |
 | `testDialect` | the dialect, and text by bytes on a database whose collation is not |
 | `testHarness` | no server, a server that does not answer, the skip flag |
+| `testSystem` | records, counters and the outbox from two stores on one tenant schema, a thread each: no counter value committed twice, no two live leases on one stream |
+| `testCore` | every result code has a string of its own; needs no server |
 
 `make check-pg` plants a session-level `search_path`, `COLLATE "C"` dropped, a
 connection reused after an error, an index build inside a transaction, a
 skipped arm reported as passing and an erasure with no vacuum after it, and
 requires each named test to fail.
+
+defiant-core runs its own suites on this backend through the same script, each
+a make target of core's that fails without a server: `test-keystore-postgres`
+(the subject suite and the erasure sweep on the Postgres key store),
+`test-listplan-postgres` (the compiled list and its sweeps),
+`test-restore-postgres` (a tenant restored through core into Postgres),
+`test-scale-postgres` (a list, a count and a create at 10,000 entities of one
+type against 1,000, by the rows the server's own plans read, with a dropped
+index planted) and `test-groups-postgres` (the purchase-order fixture through
+core, with its plants).

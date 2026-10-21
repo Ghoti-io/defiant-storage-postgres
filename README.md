@@ -25,11 +25,14 @@ if (gdefspg_model_store_create(&o, NULL, NULL, &store) == GDEFSPG_OK) {
 
 It depends, through pkg-config, on `defiant-storage`, `defiant-storage-sql`
 and `libpq`. libpq is built against only inside the image the `Containerfile`
-here defines (`ghoti-build:gcc16` plus `libpq-dev`), never on a developer host;
-without it the Makefile stops and says so. `make test` needs a throwaway
-Postgres server, which `tools/pg-test.sh` starts; `GDEFSPG_TEST_SKIP_SERVER=1`
-skips the Postgres arm and says `SKIPPED: postgres`. `documentation/postgres.md`
-has the commands, locally and on the EVO-X2.
+here defines (`ghoti-build:gcc16` with `libpq-dev` pinned at 17.11, which the
+gcc base image already carries), never on a developer host; without it the
+Makefile stops and says so. `make test` needs a throwaway Postgres server,
+which `tools/pg-test.sh` starts (the pinned `postgres:18` image by digest,
+PostgreSQL 18.6); `GDEFSPG_TEST_SKIP_SERVER=1` skips the Postgres arm and says
+`SKIPPED: postgres`, and each program that needs a server reports one test
+skipped and none passed.
+`documentation/postgres.md` has the commands, locally and on the EVO-X2.
 
 ## The API
 
@@ -43,5 +46,6 @@ for tests and diagnostics.
 
 ## Status
 
-Built in story S4 of the storage rewrite. Nothing is released; the interface
-is `@stability free`.
+Built in story S4 of the storage rewrite, with records, counters and the
+outbox (S6a) and snapshot restore (S6a3); it stores the SQL layer's schema at
+version 1. Nothing is released; the interface is `@stability free`.
