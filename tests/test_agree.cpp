@@ -96,9 +96,8 @@ void OpenPg(Pg & p, uint32_t seed) {
                   << "reference scan disagree:\n" << what;
   };
   GDEFSTOR_ModelBackend teed = tee::TeeOf(&p.tee, model);
-  GDEFSTOR_Backend kv = pgrig::EmptyKv();
-  ASSERT_EQ(GDEFSTOR_OK, gdefstor_store_create_model(&kv, &teed, nullptr,
-      nullptr, &p.store));
+  ASSERT_EQ(GDEFSTOR_OK, gdefstor_store_open(&teed, nullptr, nullptr,
+      &p.store));
 }
 
 void Sweep(uint32_t seed, Seen & seen) {

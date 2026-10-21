@@ -298,28 +298,6 @@ inline GDEFSTOR_Result ToPort(GDEFSPG_Result rc) {
   }
 }
 
-/* A key/bytes half that holds nothing, as gdefspg_model_store_create()'s. */
-inline GDEFSTOR_Backend EmptyKv() {
-  GDEFSTOR_Backend kv;
-  std::memset(&kv, 0, sizeof kv);
-  kv.destroy = [](void *) {};
-  kv.put = [](void *, const char *, size_t, const char *, size_t,
-               const uint8_t *, size_t) { return GDEFSTOR_ERR_UNSUPPORTED; };
-  kv.get = [](void *, const char *, size_t, const char *, size_t, uint8_t **,
-               size_t *) { return GDEFSTOR_ERR_INVALID; };
-  kv.remove = [](void *, const char *, size_t, const char *, size_t) {
-    return GDEFSTOR_ERR_UNSUPPORTED;
-  };
-  kv.list = [](void *, const char *, size_t, const char *, size_t,
-                char *** keys, size_t ** lens, size_t * n) {
-    *keys = nullptr;
-    *lens = nullptr;
-    *n = 0;
-    return GDEFSTOR_OK;
-  };
-  return kv;
-}
-
 }  // namespace pgrig
 
 #endif /* GDEFSPG_TESTS_PG_RIG_H */

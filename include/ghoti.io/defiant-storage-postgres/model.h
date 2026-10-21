@@ -182,7 +182,7 @@ GDEFSPG_API GDEFSPG_Result gdefspg_schema_name(const char * prefix,
 
 /**
  * @brief The entity backend over one database, for
- * gdefstor_store_create_model() or for a caller that wraps it.
+ * gdefstor_store_open() or for a caller that wraps it.
  *
  * Nothing connects yet: the first call that needs a connection makes one.
  *
@@ -202,9 +202,8 @@ GDEFSPG_API GDEFSPG_Result gdefspg_model_backend(
 /**
  * @brief Open a store with the entity port (model.h) over one database.
  *
- * Only the entity port is served: the key/bytes rows of store.h and the rest
- * have no home here until they move into the entity transaction. A read finds
- * none, and the commit of a write that holds one is ::GDEFSTOR_ERR_UNSUPPORTED.
+ * The store is opened with gdefstor_store_open() over
+ * gdefspg_model_backend().
  *
  * @param limits NULL uses the port's defaults.
  * @param out_store Receives the store; close it with gdefstor_store_destroy().

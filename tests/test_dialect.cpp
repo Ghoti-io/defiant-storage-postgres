@@ -75,9 +75,8 @@ class PgText : public ::testing::Test {
       ADD_FAILURE() << "Postgres and the reference scan disagree:\n" << what;
     };
     GDEFSTOR_ModelBackend teed = tee::TeeOf(&tee, model);
-    GDEFSTOR_Backend kv = pgrig::EmptyKv();
-    ASSERT_EQ(GDEFSTOR_OK, gdefstor_store_create_model(&kv, &teed, nullptr,
-        nullptr, &store));
+    ASSERT_EQ(GDEFSTOR_OK, gdefstor_store_open(&teed, nullptr, nullptr,
+        &store));
   }
   void TearDown() override {
     gdefstor_store_destroy(store);

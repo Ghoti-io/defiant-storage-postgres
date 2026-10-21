@@ -89,9 +89,7 @@ extern "C" GDEFSTOR_Result ModelOpen(GDEFSTOR_Store ** out,
                   << what;
   };
   GDEFSTOR_ModelBackend teed = tee::TeeOf(o.tee, model);
-  GDEFSTOR_Backend kv = pgrig::EmptyKv();
-  GDEFSTOR_Result port = gdefstor_store_create_model(&kv, &teed, alloc,
-      nullptr, out);
+  GDEFSTOR_Result port = gdefstor_store_open(&teed, alloc, nullptr, out);
   if (port != GDEFSTOR_OK) {
     model.destroy(model.ctx);
     delete o.tee;

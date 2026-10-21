@@ -1051,48 +1051,12 @@ GDEFSPG_Result gdefspg_model_backend(const GDEFSPG_Options * options,
   return rc;
 }
 
-/* The key/bytes half of a store opened here holds nothing, as the SQLite
- * backend's does: records, blobs and the outbox move into the entity
- * transaction in a later story. */
-static GDEFSTOR_Result kv_put(void * ctx, const char * t, size_t tl,
-    const char * k, size_t kl, const uint8_t * b, size_t n) {
-  (void)ctx, (void)t, (void)tl, (void)k, (void)kl, (void)b, (void)n;
-  return GDEFSTOR_ERR_UNSUPPORTED;
-}
-
-static GDEFSTOR_Result kv_get(void * ctx, const char * t, size_t tl,
-    const char * k, size_t kl, uint8_t ** out, size_t * out_len) {
-  (void)ctx, (void)t, (void)tl, (void)k, (void)kl, (void)out, (void)out_len;
-  return GDEFSTOR_ERR_INVALID; /* no such row */
-}
-
-static GDEFSTOR_Result kv_remove(void * ctx, const char * t, size_t tl,
-    const char * k, size_t kl) {
-  (void)ctx, (void)t, (void)tl, (void)k, (void)kl;
-  return GDEFSTOR_ERR_UNSUPPORTED;
-}
-
-static GDEFSTOR_Result kv_list(void * ctx, const char * t, size_t tl,
-    const char * p, size_t pl, char *** keys, size_t ** lens,
-    size_t * count) {
-  (void)ctx, (void)t, (void)tl, (void)p, (void)pl;
-  *keys = NULL;
-  *lens = NULL;
-  *count = 0;
-  return GDEFSTOR_OK; /* no rows */
-}
-
-static void kv_destroy(void * ctx) {
-  (void)ctx;
-}
-
 GDEFSPG_Result gdefspg_model_store_create(const GDEFSPG_Options * options,
     const GDEFSPG_Allocator * allocator, const GDEFSTOR_Limits * limits,
     GDEFSTOR_Store ** out_store) {
   const GDEFSPG_Allocator * alloc =
       allocator != NULL ? allocator : gdefspg_allocator_default();
   GDEFSTOR_ModelBackend model;
-  GDEFSTOR_Backend kv;
   GDEFSPG_Result rc;
   GDEFSTOR_Result prc;
   if (out_store == NULL) {
@@ -1102,13 +1066,7 @@ GDEFSPG_Result gdefspg_model_store_create(const GDEFSPG_Options * options,
   if (rc != GDEFSPG_OK) {
     return rc;
   }
-  memset(&kv, 0, sizeof kv);
-  kv.destroy = kv_destroy;
-  kv.put = kv_put;
-  kv.get = kv_get;
-  kv.remove = kv_remove;
-  kv.list = kv_list;
-  prc = gdefstor_store_create_model(&kv, &model, alloc, limits, out_store);
+  prc = gdefstor_store_open(&model, alloc, limits, out_store);
   if (prc != GDEFSTOR_OK) {
     model.destroy(model.ctx);
   }

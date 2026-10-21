@@ -43,6 +43,5 @@ for tests and diagnostics.
 
 ## Status
 
-Built in story S4 of the storage rewrite. The key/bytes half of a store has no
-home here yet (records, blobs and the outbox move into the entity transaction
-later). Nothing is released; the interface is `@stability free`.
+Built in story S4 of the storage rewrite. Nothing is released; the interface
+is `@stability free`.
