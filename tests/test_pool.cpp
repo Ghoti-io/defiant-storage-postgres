@@ -35,6 +35,7 @@
 
 #include "model_util.h"
 #include "pg_rig.h"
+#include "size_structs.h"
 
 #include <algorithm>
 #include <map>
@@ -58,6 +59,7 @@ struct Rec {
   int in_txn = 0;
   int cached = 0;
   int failed = 0;
+  size_t stats_size = 0; /* the size of the statistics it came in */
 };
 
 /* What a connection held when it went back to the pool. */
@@ -80,6 +82,7 @@ struct Seen {
 void OnStatement(void * ctx, const GDEFSPG_StatementStats * s) {
   Seen * seen = static_cast<Seen *>(ctx);
   Rec r;
+  r.stats_size = s->size;
   r.sql.assign(s->sql, s->sql_len);
   r.tenant.assign(s->tenant, s->tenant_len);
   r.pid = s->backend_pid;
@@ -188,6 +191,33 @@ class Pool : public ::testing::Test {
     return ids;
   }
 };
+
+/* AD-34: a struct with a size member is accepted at exactly its own size. The
+ * two here are the options a store is opened with and the statistics it tells
+ * the observer of each statement (size_structs.h lists every struct). */
+TEST_F(Pool, TheStructsHereAreAcceptedAtOnlyTheirOwnSize) {
+  Open(1);
+  ASSERT_EQ(GDEFSTOR_OK, Declare(store, "site.note",
+      {Field("title", T, IDX), Field("n", I)}, "ta"));
+  ASSERT_FALSE(seen.recs.empty());
+  const std::map<std::string, size_structs::Probe> probes = {
+      {"GDEFSPG_Options", [&](size_t size) {
+         GDEFSPG_Options o = Opts();
+         o.size = size;
+         GDEFSTOR_ModelBackend m;
+         GDEFSPG_Result rc = gdefspg_model_backend(&o, nullptr, &m);
+         if (rc == GDEFSPG_OK) {
+           m.destroy(m.ctx); /* nothing connected yet */
+         }
+         return rc == GDEFSPG_OK;
+       }},
+      /* The library fills it: whether it filled the size asked about. */
+      {"GDEFSPG_StatementStats", [&](size_t size) {
+         return seen.recs.back().stats_size == size;
+       }},
+  };
+  size_structs::Run(size_structs::Postgres(), "tests/test_pool.cpp", probes);
+}
 
 /* AD-25's gate: two tenants alternate on one pooled connection, and the
  * connection never carries one into the other. */

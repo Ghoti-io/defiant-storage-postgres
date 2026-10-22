@@ -129,7 +129,8 @@ typedef void (*GDEFSPG_IdleObserver)(void * ctx, void * pgconn);
 typedef void (*GDEFSPG_Refusal)(void * ctx, int result, const char * text,
     size_t len);
 
-/** How a store or key store is opened. Size-prefixed. */
+/** How a store or key store is opened. Its @ref size must be
+ * `sizeof(GDEFSPG_Options)`; any other is ::GDEFSPG_ERR_INVALID. */
 typedef struct GDEFSPG_Options {
   size_t size;               ///< `sizeof(GDEFSPG_Options)`.
   /** A libpq connection string (`host=... dbname=...` or a URI). Required.
