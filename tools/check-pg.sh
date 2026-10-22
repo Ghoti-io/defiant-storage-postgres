@@ -4,8 +4,8 @@
 #
 # Show that each defect planted in the Postgres backend turns a named test
 # red: the defects story S4 names (spine AD-25). Each plant edits a scratch
-# copy of the real source (tools/plant-lib.sh), so nothing in src/ selects a
-# defect. The plants that need the server run only when there is one
+# copy of the real source (defiant-storage's plant-lib.sh), so nothing in src/
+# selects a defect. The plants that need the server run only when there is one
 # (GDEFSPG_TEST_CONNINFO); without it this gate says so and, unless
 # GDEFSPG_TEST_SKIP_SERVER=1 was chosen, fails: it never reports a plant it
 # did not run as caught.
@@ -22,7 +22,15 @@ MAKE="${1:?usage: check-pg.sh <make> <build-dir> [make args]}"
 BUILD_DIR="${2:?usage: check-pg.sh <make> <build-dir> [make args]}"
 shift 2
 
-. tools/plant-lib.sh
+# The helpers are defiant-storage's, installed with its conformance suites;
+# the Makefile names the file.
+PLANT_LIB="${GHOTI_PLANT_LIB:-}"
+if [ ! -r "$PLANT_LIB" ]; then
+  printf '%s: defiant-storage installs the plant helpers (plant-lib.sh) with its conformance suites and none was found at "%s": install defiant-storage first, then run this through make (GHOTI_PLANT_LIB names the file)\n' \
+    "$(basename "$0")" "$PLANT_LIB" >&2
+  exit 1
+fi
+. "$PLANT_LIB"
 plant_setup "$MAKE" "$BUILD_DIR" "$@"
 
 # A skipped Postgres arm reported as passing: the arm's gate returns instead
@@ -35,8 +43,21 @@ plant skipped-arm-passes tests/pg_rig.h testHarness \
   '  case pgrig::ARM_SKIP:
     return;'
 
+# The stale-object plant. A plant's copy starts from the finished build, so the
+# edit has to be compiled into it; this one is made not to be (the objects that
+# depend on the edit are left looking up to date), and the gate has to refuse it
+# as a STALE OBJECT. If it ever passes instead, a warm copy could pass with the
+# defect never built in. It needs no server, so it runs whenever the gate does.
+plant_stale stale-object tests/pg_rig.h testHarness \
+  'PgHarness.ASkippedArmIsNeverReportedAsPassing' \
+  '  case pgrig::ARM_SKIP:
+    GTEST_SKIP() << "SKIPPED: postgres";' \
+  '  case pgrig::ARM_SKIP:
+    return;'
+
 if [ -z "${GDEFSPG_TEST_CONNINFO:-}" ]; then
   if [ "${GDEFSPG_TEST_SKIP_SERVER:-}" = 1 ]; then
+    plant_wait
     [ "$PLANT_FAIL" -eq 0 ] || exit 1
     printf 'check-pg: SKIPPED: postgres: only the harness plant ran; the plants that need a server were not run, and are not reported as caught\n'
     exit 0

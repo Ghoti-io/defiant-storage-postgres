@@ -872,8 +872,17 @@ check-aliasing: ## Fail if the strict-aliasing warning is not actually armed
 check-seams: ## Fail if libpq is reached outside src/model.c or SQL text outside the dialect
 	@tools/check-seams.sh . --self-test
 
+# The paths this Makefile bakes into objects, handed to the copy a plant builds
+# in, so the copy compiles with the same flags as this tree and keeps its
+# objects (plant-lib.sh). Left to default they would name the copy's own
+# directory, the flags stamp would differ, and every plant would recompile the
+# library. The helpers are defiant-storage's, installed with its conformance
+# suites.
+PLANT_PATHS = TEST_DATA=$(TEST_DATA) TEST_CORPUS=$(TEST_CORPUS)
+PLANT_LIB = $(STOR_CONFORMANCE)/plant-lib.sh
+
 check-pg: ## Fail unless each defect planted in the Postgres backend turns a named test red
-	@tools/check-pg.sh "$(MAKE)" "$(BUILD_DIR)" $(if $(PREFIX),PREFIX=$(PREFIX))
+	@GHOTI_PLANT_LIB=$(PLANT_LIB) tools/check-pg.sh "$(MAKE)" "$(BUILD_DIR)" $(if $(PREFIX),PREFIX=$(PREFIX)) $(PLANT_PATHS)
 
 check-symbols: ## Fail if any exported symbol lacks the version namespace
 check-symbols: $(APP_DIR)/$(TARGET)
@@ -952,6 +961,11 @@ endif
 PG_ARM_SUMMARY = if [ -z "$${GDEFSPG_TEST_CONNINFO:-}" ]; then \
 	printf '\033[0;33mSKIPPED: postgres: no server (GDEFSPG_TEST_SKIP_SERVER=1); the Postgres arm did not run and this run is not a pass of it\033[0m\n'; \
 	fi
+
+# A gate copies the finished build into its scratch tree (plant-lib.sh), so
+# under make -j no gate may start before the library and every test
+# executable are linked.
+$(TEST_GATES): | $(APP_DIR)/$(TARGET) $(TEST_EXECUTABLES)
 
 test: ## Make and run the unit tests (needs a Postgres server: tools/pg-test.sh)
 test: $(APP_DIR)/$(TARGET) $(TEST_EXECUTABLES) $(TEST_GATES)
@@ -1479,12 +1493,12 @@ clean: ## Remove all contents of the build directories.
 
 $(FLAGS_STAMP): force-flags
 	@mkdir -p $(@D)
-	@printf '%s\n' '$(CC) $(CXX) $(LIB_CFLAGS) $(CFLAGS) $(CXXFLAGS) $(LDFLAGS) $(INCLUDE) $(TEST_DATA) $(MEMLIBRARY) $(CUTIL_LIBS) $(TESTFLAGS) $(TEST_LDFLAGS) $(OS_SPECIFIC_LIBRARY_NAME_FLAG)' > $@.new
+	@printf '%s\n' '$(CC) $(CXX) $(LIB_CFLAGS) $(CFLAGS) $(CXXFLAGS) $(LDFLAGS) $(INCLUDE) $(TEST_DATA) $(TEST_CORPUS) $(MEMLIBRARY) $(CUTIL_LIBS) $(TESTFLAGS) $(TEST_LDFLAGS) $(OS_SPECIFIC_LIBRARY_NAME_FLAG)' > $@.new
 	@cmp -s $@.new $@ 2>/dev/null && rm -f $@.new || mv -f $@.new $@
 
 $(ASAN_FLAGS_STAMP): force-flags
 	@mkdir -p $(@D)
-	@printf '%s\n' '$(CC) $(CXX) $(ASAN_CFLAGS) $(ASAN_CXXFLAGS) $(ASAN_LDFLAGS) $(INCLUDE) $(TEST_DATA) $(ASAN_MEMLIBRARY) $(CUTIL_LIBS) $(TESTFLAGS)' > $@.new
+	@printf '%s\n' '$(CC) $(CXX) $(ASAN_CFLAGS) $(ASAN_CXXFLAGS) $(ASAN_LDFLAGS) $(INCLUDE) $(TEST_DATA) $(TEST_CORPUS) $(ASAN_MEMLIBRARY) $(CUTIL_LIBS) $(TESTFLAGS)' > $@.new
 	@cmp -s $@.new $@ 2>/dev/null && rm -f $@.new || mv -f $@.new $@
 
 $(FUZZ_FLAGS_STAMP): force-flags
