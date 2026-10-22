@@ -39,18 +39,27 @@
 #include "pg_rig.h"
 
 #include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 
 namespace {
 
 struct Opened {
+  std::string conninfo;
   std::string prefix;
   tee::Tee * tee = nullptr;
 };
 
+/* The allocation-failure sweeps open and close stores from several threads at
+ * once (model.inc), so the table of open stores is locked. */
 std::map<GDEFSTOR_Store *, Opened> & Stores() {
   static std::map<GDEFSTOR_Store *, Opened> m;
+  return m;
+}
+
+std::mutex & StoresLock() {
+  static std::mutex m;
   return m;
 }
 
@@ -71,8 +80,9 @@ void Refused(void * ctx, int result, const char * text, size_t len) {
 extern "C" GDEFSTOR_Result ModelOpen(GDEFSTOR_Store ** out,
     const GDEFSTOR_Allocator * alloc) {
   Opened o;
+  o.conninfo = pgrig::ThreadConninfo();
   o.prefix = pgrig::NewPrefix();
-  GDEFSPG_Options opts = pgrig::Options(pgrig::S().conninfo, o.prefix);
+  GDEFSPG_Options opts = pgrig::Options(o.conninfo, o.prefix);
   opts.on_refusal = Refused;
   /* A concurrent index build waits for every older transaction in the
    * database; a case that holds one write open while another commits would
@@ -95,21 +105,32 @@ extern "C" GDEFSTOR_Result ModelOpen(GDEFSTOR_Store ** out,
     delete o.tee;
     return port;
   }
-  Stores()[*out] = o;
+  {
+    std::lock_guard<std::mutex> hold(StoresLock());
+    Stores()[*out] = o;
+  }
   return GDEFSTOR_OK;
 }
 
 extern "C" void ModelClose(GDEFSTOR_Store * store) {
-  auto it = Stores().find(store);
+  Opened o;
+  bool known = false;
+  {
+    std::lock_guard<std::mutex> hold(StoresLock());
+    auto it = Stores().find(store);
+    if (it != Stores().end()) {
+      o = it->second;
+      known = true;
+      Stores().erase(it);
+    }
+  }
   gdefstor_store_destroy(store);
-  if (it == Stores().end()) {
+  if (!known) {
     return;
   }
-  EXPECT_EQ(0, it->second.tee->disagreements)
-      << it->second.tee->first_disagreement;
-  delete it->second.tee;
-  pgrig::DropPrefix(pgrig::S().conninfo, it->second.prefix);
-  Stores().erase(it);
+  EXPECT_EQ(0, o.tee->disagreements) << o.tee->first_disagreement;
+  delete o.tee;
+  pgrig::DropPrefix(o.conninfo, o.prefix);
 }
 
 GDEFSTOR_Result KeyStoreOpen(const GDEFSTOR_KeyCipher * cipher,

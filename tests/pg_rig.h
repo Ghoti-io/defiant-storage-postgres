@@ -47,9 +47,11 @@
 #include <ghoti.io/defiant-storage-postgres/defiant-storage-postgres.h>
 #include <libpq-fe.h>
 
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <unistd.h>
 #include <vector>
@@ -244,9 +246,10 @@ namespace pgrig {
 
 /* A schema prefix of this process and this store: never another's. */
 inline std::string NewPrefix() {
-  static unsigned n = 0;
+  static std::atomic<unsigned> n(0);
   char b[GDEFSPG_MAX_SCHEMA_PREFIX + 1];
-  std::snprintf(b, sizeof b, "p%x_%u_", (unsigned)getpid() & 0xfffffu, ++n);
+  std::snprintf(b, sizeof b, "p%x_%u_", (unsigned)getpid() & 0xfffffu,
+      n.fetch_add(1) + 1);
   return b;
 }
 
@@ -261,6 +264,69 @@ inline void DropPrefix(const std::string & conninfo, const std::string & prefix)
   for (const auto & r : rows) {
     side.Exec("DROP SCHEMA \"" + r[0] + "\" CASCADE");
   }
+}
+
+/* A database for each thread that opens stores.
+ *
+ * Every store builds its indexes with CREATE INDEX CONCURRENTLY, which waits
+ * for every transaction older than it in the same database. The
+ * allocation-failure sweeps open stores from several threads at once, and in
+ * one database those waits make the threads queue behind each other. So the
+ * first thread to open a store uses the database the server was started with
+ * and each other thread running at the same time uses one of its own
+ * (gdefspg_w1, gdefspg_w2, ...), made when first needed and kept. */
+inline std::mutex & SlotLock() {
+  static std::mutex m;
+  return m;
+}
+
+inline bool * SlotsInUse() {
+  static bool used[16] = {};
+  return used;
+}
+
+struct SlotHolder {
+  int slot = 0;
+  SlotHolder() {
+    std::lock_guard<std::mutex> hold(SlotLock());
+    for (int i = 0; i < 16; i++) {
+      if (!SlotsInUse()[i]) {
+        SlotsInUse()[i] = true;
+        slot = i;
+        return;
+      }
+    }
+  }
+  ~SlotHolder() {
+    std::lock_guard<std::mutex> hold(SlotLock());
+    SlotsInUse()[slot] = false;
+  }
+};
+
+/* The database this thread's stores go in. */
+inline std::string ThreadConninfo() {
+  thread_local SlotHolder holder;
+  if (holder.slot == 0) {
+    return S().conninfo;
+  }
+  char name[32];
+  std::snprintf(name, sizeof name, "gdefspg_w%d", holder.slot);
+  {
+    std::lock_guard<std::mutex> hold(SlotLock());
+    static bool made[16] = {};
+    if (!made[holder.slot]) {
+      Side side(S().conninfo);
+      if (side.Ok() &&
+          side.One(std::string("SELECT count(*) FROM pg_database WHERE "
+                               "datname = '") + name + "'") == "0") {
+        /* Another test program may make it first; then this fails and the
+         * database is there. */
+        PQclear(PQexec(side.c, (std::string("CREATE DATABASE ") + name).c_str()));
+      }
+      made[holder.slot] = true;
+    }
+  }
+  return WithDb(S().conninfo, name);
 }
 
 inline GDEFSPG_Options Options(const std::string & conninfo,
